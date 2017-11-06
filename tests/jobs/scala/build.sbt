@@ -4,7 +4,10 @@ lazy val root = (project in file("."))
     scalaVersion := "2.11.8",
     libraryDependencies ++= Seq(
       "org.apache.spark" %% "spark-core" % "2.1.0" % "provided",
+      "org.apache.spark" %% "spark-streaming" % "2.1.0" % "provided",
+      "org.apache.spark" %% "spark-sql" % "2.1.0" % "provided",
       "org.apache.hadoop" % "hadoop-aws" % "2.6.0",
+      "org.apache.kafka" % "kafka_2.10" % "0.8.2.0",
       "com.github.scopt" %% "scopt" % "3.7.0"
     )
   )
