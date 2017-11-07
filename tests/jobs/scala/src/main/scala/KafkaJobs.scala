@@ -3,18 +3,55 @@ import java.util
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
 import org.apache.spark.storage.StorageLevel
-import org.apache.spark.sql._
+import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.spark.streaming.kafka010._
 import org.apache.spark.streaming.{Seconds, StreamingContext}
-
-import scala.util.Random
 import org.apache.spark.streaming.receiver._
 
-import scala.annotation.tailrec
 import scala.util.Random
+
+object KafkaConsumer {
+  def main(args: Array[String]): Unit = {
+    if (args.length != 2) {
+      throw new IllegalArgumentException("USAGE: <brokerlist> <topic>")
+    }
+
+    val Array(brokers, topic) = args
+
+    val conf = new SparkConf().setAppName("Kafka->Spark Validator Consumer")
+    val ssc = new StreamingContext(conf, Seconds(2))
+    //val props = DefaultProps.getDefaultProps(brokers)
+
+    println(s"Using brokers $brokers and topic $topic")
+
+    val props = Map[String, Object](
+      "bootstrap.servers" -> brokers,
+      "key.deserializer" -> classOf[StringDeserializer],
+      "value.deserializer" -> classOf[StringDeserializer],
+      "group.id" -> "use_a_separate_group_id_for_each_stream",
+      "auto.offset.reset" -> "latest",
+      "enable.auto.commit" -> (false: java.lang.Boolean)
+    )
+
+    val messages = KafkaUtils.createDirectStream[String, String](
+      ssc,
+      LocationStrategies.PreferConsistent,
+      ConsumerStrategies.Subscribe[String, String](Array(topic), props))
+
+    val lines = messages.map(_.value)
+    val words = lines.flatMap(_.split(" "))
+    val wordCounts = words.map(x => (x, 1L)).reduceByKey(_ + _)
+    wordCounts.map(w => w._2)
+
+    // Start the computation
+    ssc.start()
+    ssc.awaitTermination()
+  }
+}
 
 
 object KafkaProducer {
-  class DummySource(ratePerSec: Int) extends Receiver[String](StorageLevel.MEMORY_AND_DISK_2) {
+  class SmartySource(words: Array[String], sentenceLength: Int, ratePerSec: Int) extends Receiver[String](StorageLevel.MEMORY_AND_DISK_2) {
 
     def onStart() {
       // Start the thread that receives data over a connection
@@ -31,46 +68,30 @@ object KafkaProducer {
     /** Create a socket connection and receive data until receiver is stopped */
     private def receive() {
       while(!isStopped()) {
-        store("I am a dummy source " + Random.nextInt(10))
+        // could do something where you wait for the sentence length to get so long
+        // and you add words with their frequency probability
+        store(Random.shuffle(words.toList).take(sentenceLength).mkString(" "))
         Thread.sleep((1000.toDouble / ratePerSec).toInt)
       }
     }
   }
 
-
-
-  @tailrec
-  def doRandomString(n: Int, charSet:Seq[Char], list: List[Char]): List[Char] = {
-    val rndPosition = Random.nextInt(charSet.length)
-    val rndChar = charSet(rndPosition)
-    if (n == 1) rndChar :: list
-    else doRandomString(n - 1, charSet, rndChar :: list)
-  }
-
-  def randomString(n: Int): String = {
-    val chars = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9')
-    doRandomString(n, chars, Nil).mkString
-  }
-
   def main(args: Array[String]): Unit = {
-    if (args.length != 2) {
-      throw new IllegalArgumentException("USAGE: <brokerlist> <topic>")
+    if (args.length != 3) {
+      throw new IllegalArgumentException("USAGE: <brokerlist> <file> <topic>")
     }
-    val Array(brokers, topic) = args
+    val Array(brokers, infile, topic) = args
     println(s"Got brokers $brokers, and producing to topic $topic")
     val conf = new SparkConf().setAppName("Spark->Kafka Producer")
     val sc = new SparkContext(conf)
     val ssc = new StreamingContext(sc, Seconds(2))
-
-    val sqlContext = new SQLContext(sc)
-    import sqlContext.implicits._
-
-    val stream = ssc.receiverStream(new DummySource(1))
-    val wordStream = stream.flatMap { l => l.split(" ")}
-    val wordCountStream = wordStream.map { w => (w, 1) }.reduceByKey(_ + _)
-    wordCountStream.foreachRDD { rdd => rdd.toDF("word", "count").registerTempTable("batch_word_count") }
-
-    wordCountStream.foreachRDD { rdd =>
+    val words = sc.textFile(infile).flatMap(l => l.split(" "))
+      .map(w => (w, 1))
+      .reduceByKey(_ + _)
+      .map(t => t._1)
+    println(s"Got ${words.count} unique words")
+    val stream = ssc.receiverStream(new SmartySource(words.collect, 4, 1))
+    stream.foreachRDD { rdd =>
       println(s"Number of events: ${rdd.count()}")
       rdd.foreachPartition { p =>
         val props = new util.HashMap[String, Object]()
