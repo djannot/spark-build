@@ -41,7 +41,7 @@ object KafkaConsumer {
     val lines = messages.map(_.value)
     val words = lines.flatMap(_.split(" "))
     val wordCounts = words.map(x => (x, 1L)).reduceByKey(_ + _)
-    wordCounts.map(w => w._2)
+    wordCounts.print()
 
     // Start the computation
     ssc.start()
