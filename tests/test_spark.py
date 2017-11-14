@@ -36,9 +36,9 @@ def setup_module(module):
 
 def teardown_module(module):
     shakedown.uninstall_package_and_wait(SPARK_PACKAGE_NAME)
-    if utils.hdfs_enabled():
-        shakedown.uninstall_package_and_wait(HDFS_PACKAGE_NAME, HDFS_SERVICE_NAME)
-        _run_janitor(HDFS_SERVICE_NAME)
+    #if utils.hdfs_enabled():
+        #shakedown.uninstall_package_and_wait(HDFS_PACKAGE_NAME, HDFS_SERVICE_NAME)
+        #_run_janitor(HDFS_SERVICE_NAME)
 
 
 @pytest.mark.sanity
@@ -67,12 +67,36 @@ def test_sparkPi():
 @pytest.mark.sanity
 def test_teragen():
     if utils.hdfs_enabled():
-        jar_url = 'https://downloads.mesosphere.io/spark/examples/spark-terasort-1.0-jar-with-dependencies_2.11.jar'
+        jar_url = 'https://downloads.mesosphere.io/spark/examples/spark-terasort-1.1-jar-with-dependencies_2.11.jar'
+        kerberos_args = ["--kerberos-principal", "hdfs/name-0-node.hdfs.autoip.dcos.thisdcos.directory@LOCAL",
+                         "--keytab-secret-path", "/__dcos_base64___keytab"]
+
+        teragen_args=["--class", "com.github.ehiggs.spark.terasort.TeraGen"]
+        if utils.is_kerberized():
+            teragen_args += kerberos_args
         utils.run_tests(app_url=jar_url,
                         app_args="1g hdfs:///terasort_in",
                         expected_output="Number of records written",
                         app_name="/spark",
-                        args=["--class", "com.github.ehiggs.spark.terasort.TeraGen"])
+                        args=teragen_args)
+
+        terasort_args = ["--class", "com.github.ehiggs.spark.terasort.TeraSort"]
+        if utils.is_kerberized():
+            terasort_args += kerberos_args
+        utils.run_tests(app_url=jar_url,
+                        app_args="hdfs:///terasort_in hdfs:///terasort_out",
+                        expected_output="",
+                        app_name="/spark",
+                        args=terasort_args)
+
+        teravalidate_args = ["--class", "com.github.ehiggs.spark.terasort.TeraValidate"]
+        if utils.is_kerberized():
+            teravalidate_args += kerberos_args
+        utils.run_tests(app_url=jar_url,
+                        app_args="hdfs:///terasort_out hdfs:///terasort_validate",
+                        expected_output="partitions are properly sorted",
+                        app_name="/spark",
+                        args=teravalidate_args)
 
 
 @pytest.mark.sanity

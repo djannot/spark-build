@@ -35,12 +35,16 @@ def is_strict():
     return os.environ.get('SECURITY') == 'strict'
 
 
+def is_kerberized():
+    return True
+
+
 def require_hdfs():
     LOGGER.info("Ensuring HDFS is installed.")
 
     _require_package(
         HDFS_PACKAGE_NAME,
-        _get_hdfs_options(),
+        options=_get_hdfs_options(),
         # Remove after HDFS-483 is fixed
         package_version='2.0.1-2.6.0-cdh5.11.0'
     )
@@ -98,7 +102,7 @@ def _require_spark_cli():
         LOGGER.info("Spark CLI already installed.")
     else:
         LOGGER.info("Installing Spark CLI.")
-        shakedown.run_dcos_command('package install --cli {}'.format(
+        shakedown.run_dcos_command('package install --cli {} --yes'.format(
             SPARK_PACKAGE_NAME))
 
 
@@ -152,6 +156,10 @@ def _get_spark_options(options = None):
         options["security"]["mesos"]["authentication"] = options["security"]["mesos"].get("authentication", {})
         options["security"]["mesos"]["authentication"]["secret_name"] = "secret"
 
+    if is_kerberized():
+        options["security"] = options.get("security", {})
+        options["security"]["kerberos"] = options["security"].get("kerberos", {})
+        options["security"]["kerberos"]["krb5conf"] = "W2xpYmRlZmF1bHRzXQpkZWZhdWx0X3JlYWxtID0gTE9DQUwKZG5zX2xvb2t1cF9yZWFsbSA9IHRydWUKZG5zX2xvb2t1cF9rZGMgPSB0cnVlCnVkcF9wcmVmZXJlbmNlX2xpbWl0ID0gMQoKW3JlYWxtc10KICBMT0NBTCA9IHsKICAgIGtkYyA9IGtkYy5tYXJhdGhvbi5tZXNvczoyNTAwCiAgfQoKW2RvbWFpbl9yZWFsbV0KICAuaGRmcy5kY29zID0gTE9DQUwKICBoZGZzLmRjb3MgPSBMT0NBTAo="
 
     return options
 
