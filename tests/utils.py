@@ -46,7 +46,7 @@ def require_hdfs():
     _wait_for_hdfs()
 
 
-def require_spark(options={}, service_name=None, use_hdfs=False):
+def require_spark(options=None, service_name=None, use_hdfs=False):
     LOGGER.info("Ensuring Spark is installed.")
 
     _require_package(SPARK_PACKAGE_NAME, service_name, _get_spark_options(options, use_hdfs))
@@ -134,7 +134,7 @@ def no_spark_jobs(service_name):
     return len(driver_ips) == 0
 
 
-def _get_spark_options(options = None, use_hdfs=False):
+def _get_spark_options(options, use_hdfs):
     if options is None:
         options = {}
 

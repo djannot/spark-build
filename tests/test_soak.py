@@ -18,7 +18,7 @@ COMMON_ARGS = ["--conf", "spark.driver.port=1024",
 
 
 def setup_module(module):
-    utils.require_spark()
+    utils.require_spark(use_hdfs=True)
 
 
 @pytest.mark.soak
