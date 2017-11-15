@@ -6,7 +6,7 @@ import logging
 import pytest
 import shakedown
 
-import utils
+from tests import utils
 
 
 LOGGER = logging.getLogger(__name__)
