@@ -22,13 +22,24 @@ def _init_logging():
 _init_logging()
 LOGGER = logging.getLogger(__name__)
 DEFAULT_HDFS_TASK_COUNT=10
+DEFAULT_KAFKA_TASK_COUNT=3
 HDFS_PACKAGE_NAME='hdfs'
 HDFS_SERVICE_NAME='hdfs'
+KERBERIZED_KAFKA = False
+KAFKA_KRB5="W2xpYmRlZmF1bHRzXQpkZWZhdWx0X3JlYWxtID0gTE9DQUwKCltyZW" \
+           "FsbXNdCiAgTE9DQUwgPSB7CiAgICBrZGMgPSBrZGMubWFyYXRob24u" \
+           "YXV0b2lwLmRjb3MudGhpc2Rjb3MuZGlyZWN0b3J5OjI1MDAKICB9Cg=="
+KAFKA_PACKAGE_NAME="beta-kafka"
+KAFKA_SERVICE_NAME="secure-kafka" if KERBERIZED_KAFKA else "kafka"
 SPARK_PACKAGE_NAME='spark'
 
 
 def hdfs_enabled():
     return os.environ.get("HDFS_ENABLED") != "false"
+
+
+def kafka_enabled():
+    return os.environ.get("KAFKA_ENABLED") != "false"
 
 
 def is_strict():
@@ -45,6 +56,39 @@ def require_hdfs():
         package_version='2.0.1-2.6.0-cdh5.11.0'
     )
     _wait_for_hdfs()
+
+
+def require_kafka(kerberized):
+    LOGGER.info("Ensuring KAFKA is installed")
+
+    _require_package(KAFKA_PACKAGE_NAME,
+                     _get_kafka_options(kerberized))
+
+    shakedown.wait_for(is_service_ready(KAFKA_PACKAGE_NAME, DEFAULT_KAFKA_TASK_COUNT),
+                       ignore_exceptions=False, timeout_seconds=25 * 60)
+
+
+def kafka_broker_dns():
+    cmd = "dcos {package_name} --name={service_name} endpoints broker".format(
+        package_name=KAFKA_PACKAGE_NAME, service_name=KAFKA_SERVICE_NAME)
+    try:
+        stdout = subprocess.check_output(cmd, shell=True).decode('utf-8')
+    except Exception as e:
+        raise e("Failed to get broker endpoints")
+
+    return json.loads(stdout)["dns"][0]
+
+
+def streaming_job_launched(job_name):
+    return shakedown.get_service(job_name) is not None
+
+
+def streaming_job_running(job_name):
+    f = shakedown.get_service(job_name)
+    if f is None:
+        return False
+    else:
+        return len([x for x in f.dict()["tasks"] if x["state"] == "TASK_RUNNING"]) > 0
 
 
 def require_spark(options={}, service_name=None):
@@ -100,6 +144,13 @@ def _require_spark_cli():
         LOGGER.info("Installing Spark CLI.")
         shakedown.run_dcos_command('package install --cli {}'.format(
             SPARK_PACKAGE_NAME))
+
+
+def _get_kafka_options(kerberized):
+    if kerberized:
+        raise NotImplementedError("TODO")
+    else:
+        return {"service": {}}
 
 
 def _get_hdfs_options():

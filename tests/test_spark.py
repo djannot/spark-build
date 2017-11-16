@@ -28,17 +28,17 @@ SECRET_CONTENTS = "mgummelt"
 
 
 def setup_module(module):
-    if utils.hdfs_enabled():
-        utils.require_hdfs()
+#    if utils.hdfs_enabled():
+#        utils.require_hdfs()
     utils.require_spark()
-    utils.upload_file(os.environ["SCALA_TEST_JAR_PATH"])
+#    utils.upload_file(os.environ["SCALA_TEST_JAR_PATH"])
 
 
-def teardown_module(module):
-    shakedown.uninstall_package_and_wait(SPARK_PACKAGE_NAME)
-    if utils.hdfs_enabled():
-        shakedown.uninstall_package_and_wait(HDFS_PACKAGE_NAME, HDFS_SERVICE_NAME)
-        _run_janitor(HDFS_SERVICE_NAME)
+#def teardown_module(module):
+#    shakedown.uninstall_package_and_wait(SPARK_PACKAGE_NAME)
+#    if utils.hdfs_enabled():
+#        shakedown.uninstall_package_and_wait(HDFS_PACKAGE_NAME, HDFS_SERVICE_NAME)
+#        _run_janitor(HDFS_SERVICE_NAME)
 
 
 @pytest.mark.sanity
@@ -142,6 +142,86 @@ def test_python():
                     args=["--py-files", py_file_url])
 
 
+@pytest.mark.runnow
+def test_kafka():
+    producer_service_name = "Spark->Kafka Producer"
+    def producer_launched():
+        return utils.streaming_job_launched(producer_service_name)
+
+    def producer_started():
+        return utils.streaming_job_running(producer_service_name)
+
+    if utils.kafka_enabled():
+        kerberos_flag = "true" if utils.KERBERIZED_KAFKA else "false"  # flag for using kerberized kafka given to app
+        stop_count = "48"  # some reasonable number
+        #broker_dns = utils.kafka_broker_dns()
+        broker_dns = "kafka-0-broker.{}.autoip.dcos.thisdcos.directory:1025".format(utils.KAFKA_SERVICE_NAME)
+        topic = "top1"
+
+        big_file, big_file_url = "/mnt/mesos/sandbox/big.txt", "http://norvig.com/big.txt"
+
+        # arguments to the application
+        producer_args = " ".join([broker_dns, big_file, topic, kerberos_flag])
+
+        uris = "spark.mesos.uris=http://norvig.com/big.txt"
+        if utils.KERBERIZED_KAFKA:
+            uris += ",http://s3-us-west-2.amazonaws.com/arand-sandbox-mesosphere/client-jaas-executor-grover.conf"
+
+        common_args = [
+            "--conf", "spark.mesos.containerizer=mesos",
+            "--conf", "spark.scheduler.maxRegisteredResourcesWaitingTime=2400s",
+            "--conf", "spark.scheduler.minRegisteredResourcesRatio=1.0",
+            "--conf", uris
+        ]
+
+        kerberos_args = [
+            "--conf", "spark.mesos.driver.secret.names=__dcos_base64___keytab",
+            "--conf", "spark.mesos.driver.secret.filenames=kafka-client.keytab",
+            "--conf", "spark.mesos.executor.secret.names=__dcos_base64___keytab",
+            "--conf", "spark.mesos.executor.secret.filenames=kafka-client.keytab",
+            "--conf", "spark.mesos.task.labels=DCOS_SPACE:/spark",
+            "--conf", "spark.executorEnv.KRB5_CONFIG_BASE64={}".format(utils.KAFKA_KRB5),
+            "--conf", "spark.mesos.driverEnv.KRB5_CONFIG_BASE64={}".format(utils.KAFKA_KRB5),
+            "--conf", "spark.driver.extraJavaOptions=-Djava.security.auth.login.config="
+                        "/mnt/mesos/sandbox/client-jaas-executor-grover.conf",
+            "--conf", "spark.executor.extraJavaOptions="
+                      "-Djava.security.auth.login.config=/mnt/mesos/sandbox/client-jaas-executor-grover.conf",
+            "--conf", "spark.mesos.uris="
+                      "http://s3-us-west-2.amazonaws.com/arand-sandbox-mesosphere/client-jaas-executor-grover.conf,"
+                      "http://norvig.com/big.txt"
+        ]
+
+        producer_config = ["--conf", "spark.cores.max=2", "--class", "KafkaProducer"] + common_args
+
+        if utils.KERBERIZED_KAFKA:
+            producer_config += kerberos_args
+
+        producer_id = utils.submit_job(app_url=_scala_test_jar_url(),
+                                       app_args=producer_args,
+                                       app_name="/spark",
+                                       args=producer_config)
+
+        shakedown.wait_for(lambda: producer_launched(), ignore_exceptions=False, timeout_seconds=600)
+        shakedown.wait_for(lambda: producer_started(), ignore_exceptions=False, timeout_seconds=600)
+
+        consumer_config = ["--conf", "spark.cores.max=4", "--class", "KafkaConsumer"] + common_args
+
+        if utils.KERBERIZED_KAFKA:
+            consumer_config += kerberos_args
+
+        consumer_args = " ".join([broker_dns, topic, stop_count, kerberos_flag])
+
+        utils.run_tests(app_url=_scala_test_jar_url(),
+                        app_args=consumer_args,
+                        expected_output="Read {} words".format(stop_count),
+                        app_name="/spark",
+                        args=consumer_config)
+
+        utils.kill_driver(producer_id, "/spark")
+
+
+
+
 @pytest.mark.skip(reason="must be run manually against a kerberized HDFS")
 def test_kerberos():
     '''This test must be run manually against a kerberized HDFS cluster.
@@ -231,7 +311,6 @@ def _check_task_network_info(task):
 
 
 @pytest.mark.sanity
-@pytest.mark.runnow
 def test_s3():
     linecount_path = os.path.join(THIS_DIR, 'resources', 'linecount.txt')
     s3.upload_file(linecount_path)
