@@ -235,3 +235,7 @@ def _run_janitor():
 def teardown_spark():
     shakedown.uninstall_package_and_wait(SPARK_PACKAGE_NAME)
     _run_janitor()
+
+
+def _scala_test_jar_url():
+    return s3.http_url(os.path.basename(os.environ["SCALA_TEST_JAR_PATH"]))
