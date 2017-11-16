@@ -29,7 +29,7 @@ KERBERIZED_KAFKA = False
 KAFKA_KRB5="W2xpYmRlZmF1bHRzXQpkZWZhdWx0X3JlYWxtID0gTE9DQUwKCltyZW" \
            "FsbXNdCiAgTE9DQUwgPSB7CiAgICBrZGMgPSBrZGMubWFyYXRob24u" \
            "YXV0b2lwLmRjb3MudGhpc2Rjb3MuZGlyZWN0b3J5OjI1MDAKICB9Cg=="
-KAFKA_PACKAGE_NAME="beta-kafka"
+KAFKA_PACKAGE_NAME="kafka"
 KAFKA_SERVICE_NAME="secure-kafka" if KERBERIZED_KAFKA else "kafka"
 SPARK_PACKAGE_NAME='spark'
 
@@ -58,13 +58,12 @@ def require_hdfs():
     _wait_for_hdfs()
 
 
-def require_kafka(kerberized):
+def require_kafka():
     LOGGER.info("Ensuring KAFKA is installed")
 
-    _require_package(KAFKA_PACKAGE_NAME,
-                     _get_kafka_options(kerberized))
+    _require_package(KAFKA_PACKAGE_NAME, _get_kafka_options(KERBERIZED_KAFKA))
 
-    shakedown.wait_for(is_service_ready(KAFKA_PACKAGE_NAME, DEFAULT_KAFKA_TASK_COUNT),
+    shakedown.wait_for(lambda: is_service_ready(KAFKA_PACKAGE_NAME, DEFAULT_KAFKA_TASK_COUNT),
                        ignore_exceptions=False, timeout_seconds=25 * 60)
 
 
@@ -203,7 +202,6 @@ def _get_spark_options(options = None):
         options["security"]["mesos"]["authentication"] = options["security"]["mesos"].get("authentication", {})
         options["security"]["mesos"]["authentication"]["secret_name"] = "secret"
 
-
     return options
 
 
@@ -299,3 +297,7 @@ def _task_log(task_id, filename=None):
 def is_framework_completed(fw_name):
     # The framework is not Active or Inactive
     return shakedown.get_service(fw_name, True) is None
+
+
+def _scala_test_jar_url():
+    return s3.http_url(os.path.basename(os.environ["SCALA_TEST_JAR_PATH"]))
