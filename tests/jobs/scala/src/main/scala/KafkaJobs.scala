@@ -4,27 +4,46 @@ import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
 import org.apache.spark.storage.StorageLevel
 import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.kafka010._
-import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.util.LongAccumulator
+import org.apache.spark.streaming.{Seconds, StreamingContext, Time}
 import org.apache.spark.streaming.receiver._
 
+import scala.collection.mutable
 import scala.util.Random
+
+object WordAccumulator {
+
+  @volatile private var instance: LongAccumulator = null
+
+  def getInstance(sc: SparkContext): LongAccumulator = {
+    if (instance == null) {
+      synchronized {
+        if (instance == null) {
+          instance = sc.longAccumulator("WordAccumulator")
+        }
+      }
+    }
+    instance
+  }
+}
+
 
 object KafkaConsumer {
   def main(args: Array[String]): Unit = {
-    if (args.length != 2) {
-      throw new IllegalArgumentException("USAGE: <brokerlist> <topic>")
+    if (args.length != 4) {
+      throw new IllegalArgumentException("USAGE: <brokerlist> <topic> <stop_at> <use kerberos? [true/false]>")
     }
 
-    val Array(brokers, topic) = args
+    val Array(brokers, topic, stopcount, kerberized) = args
 
     val conf = new SparkConf().setAppName("Kafka->Spark Validator Consumer")
     val ssc = new StreamingContext(conf, Seconds(2))
-    //val props = DefaultProps.getDefaultProps(brokers)
 
     println(s"Using brokers $brokers and topic $topic")
 
-    val props = Map[String, Object](
+    val props = mutable.Map[String, Object](
       "bootstrap.servers" -> brokers,
       "key.deserializer" -> classOf[StringDeserializer],
       "value.deserializer" -> classOf[StringDeserializer],
@@ -32,6 +51,18 @@ object KafkaConsumer {
       "auto.offset.reset" -> "latest",
       "enable.auto.commit" -> (false: java.lang.Boolean)
     )
+
+    if (kerberized == "true") {
+      val kerbProps = Map[String, Object](
+        "sasl.kerberos.service.name" -> "kafka",
+        "security.protocol" -> "SASL_PLAINTEXT",
+        "sasl.mechanism" -> "GSSAPI"
+      )
+
+      props ++= kerbProps
+    }
+
+    println(s"using properties $props")
 
     val messages = KafkaUtils.createDirectStream[String, String](
       ssc,
@@ -41,6 +72,15 @@ object KafkaConsumer {
     val lines = messages.map(_.value)
     val words = lines.flatMap(_.split(" "))
     val wordCounts = words.map(x => (x, 1L)).reduceByKey(_ + _)
+    wordCounts.foreachRDD { (rdd: RDD[(String, Long)], time: Time) =>
+      val totalCount = WordAccumulator.getInstance(rdd.sparkContext)
+      rdd.foreach { case (w, c) => totalCount.add(c) }
+      if (totalCount.value >= stopcount.toLong) {
+        println(s"Read $stopcount words")
+        ssc.stop(true, false)
+      }
+      println(s"total count is ${totalCount.value}")
+    }
     wordCounts.print()
 
     // Start the computation
@@ -51,7 +91,8 @@ object KafkaConsumer {
 
 
 object KafkaProducer {
-  class SmartySource(words: Array[String], sentenceLength: Int, ratePerSec: Int) extends Receiver[String](StorageLevel.MEMORY_AND_DISK_2) {
+  class SmartySource(words: Array[String], sentenceLength: Int, ratePerSec: Int)
+    extends Receiver[String](StorageLevel.MEMORY_AND_DISK_2) {
 
     def onStart() {
       // Start the thread that receives data over a connection
@@ -77,10 +118,10 @@ object KafkaProducer {
   }
 
   def main(args: Array[String]): Unit = {
-    if (args.length != 3) {
-      throw new IllegalArgumentException("USAGE: <brokerlist> <file> <topic>")
+    if (args.length != 4) {
+      throw new IllegalArgumentException("USAGE: <brokerlist> <file> <topic> <use kerberos? [true/false]>")
     }
-    val Array(brokers, infile, topic) = args
+    val Array(brokers, infile, topic, kerberized) = args
     println(s"Got brokers $brokers, and producing to topic $topic")
     val conf = new SparkConf().setAppName("Spark->Kafka Producer")
     val sc = new SparkContext(conf)
@@ -100,6 +141,11 @@ object KafkaProducer {
           "org.apache.kafka.common.serialization.StringSerializer")
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
           "org.apache.kafka.common.serialization.StringSerializer")
+        if (kerberized ==  "true") {
+          props.put("sasl.kerberos.service.name", "kafka")
+          props.put("security.protocol", "SASL_PLAINTEXT")
+          props.put("sasl.mechanism", "GSSAPI")
+        }
         val producer = new KafkaProducer[String, String](props)
         p.foreach { r =>
           val d = r.toString()

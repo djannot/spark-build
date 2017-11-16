@@ -30,6 +30,10 @@ def hdfs_enabled():
     return os.environ.get("HDFS_ENABLED") != "false"
 
 
+def kafka_enabled():
+    return os.environ.get("KAFKA_ENABLED") != "false"
+
+
 def is_strict():
     return os.environ.get('SECURITY') == 'strict'
 

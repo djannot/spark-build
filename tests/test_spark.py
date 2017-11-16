@@ -190,7 +190,6 @@ def _check_task_network_info(task):
 
 
 @pytest.mark.sanity
-@pytest.mark.runnow
 def test_s3():
     linecount_path = os.path.join(THIS_DIR, 'resources', 'linecount.txt')
     s3.upload_file(linecount_path)
