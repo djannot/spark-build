@@ -10,6 +10,16 @@ import utils
 
 PRODUCER_SERVICE_NAME="Spark->Kafka Producer"
 
+
+def setup_module(module):
+    utils.require_spark()
+    utils.upload_file(os.environ["SCALA_TEST_JAR_PATH"])
+
+
+def teardown_module(module):
+    shakedown.uninstall_package_and_wait(utils.SPARK_PACKAGE_NAME)
+
+
 @pytest.mark.runnow
 @pytest.mark.sanity
 def test_kafka():
