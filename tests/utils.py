@@ -7,10 +7,11 @@ import logging
 import os
 import re
 import requests
-import s3
 import shakedown
 import subprocess
 import urllib
+
+from tests import s3
 
 
 def _init_logging():
@@ -21,16 +22,11 @@ def _init_logging():
 
 _init_logging()
 LOGGER = logging.getLogger(__name__)
+
 DEFAULT_HDFS_TASK_COUNT=10
-DEFAULT_KAFKA_TASK_COUNT=3
 HDFS_PACKAGE_NAME='hdfs'
 HDFS_SERVICE_NAME='hdfs'
-KERBERIZED_KAFKA = False
-KAFKA_KRB5="W2xpYmRlZmF1bHRzXQpkZWZhdWx0X3JlYWxtID0gTE9DQUwKCltyZW" \
-           "FsbXNdCiAgTE9DQUwgPSB7CiAgICBrZGMgPSBrZGMubWFyYXRob24u" \
-           "YXV0b2lwLmRjb3MudGhpc2Rjb3MuZGlyZWN0b3J5OjI1MDAKICB9Cg=="
-KAFKA_PACKAGE_NAME="kafka"
-KAFKA_SERVICE_NAME="secure-kafka" if KERBERIZED_KAFKA else "kafka"
+
 SPARK_PACKAGE_NAME='spark'
 
 
@@ -51,31 +47,9 @@ def require_hdfs():
 
     _require_package(
         HDFS_PACKAGE_NAME,
-        _get_hdfs_options(),
-        # Remove after HDFS-483 is fixed
-        package_version='2.0.1-2.6.0-cdh5.11.0'
+        options=_get_hdfs_options()
     )
     _wait_for_hdfs()
-
-
-def require_kafka():
-    LOGGER.info("Ensuring KAFKA is installed")
-
-    _require_package(KAFKA_PACKAGE_NAME, _get_kafka_options(KERBERIZED_KAFKA))
-
-    shakedown.wait_for(lambda: is_service_ready(KAFKA_PACKAGE_NAME, DEFAULT_KAFKA_TASK_COUNT),
-                       ignore_exceptions=False, timeout_seconds=25 * 60)
-
-
-def kafka_broker_dns():
-    cmd = "dcos {package_name} --name={service_name} endpoints broker".format(
-        package_name=KAFKA_PACKAGE_NAME, service_name=KAFKA_SERVICE_NAME)
-    try:
-        stdout = subprocess.check_output(cmd, shell=True).decode('utf-8')
-    except Exception as e:
-        raise e("Failed to get broker endpoints")
-
-    return json.loads(stdout)["dns"][0]
 
 
 def streaming_job_launched(job_name):
@@ -90,10 +64,10 @@ def streaming_job_running(job_name):
         return len([x for x in f.dict()["tasks"] if x["state"] == "TASK_RUNNING"]) > 0
 
 
-def require_spark(options={}, service_name=None):
+def require_spark(options=None, service_name=None, use_hdfs=False):
     LOGGER.info("Ensuring Spark is installed.")
 
-    _require_package(SPARK_PACKAGE_NAME, service_name, _get_spark_options(options))
+    _require_package(SPARK_PACKAGE_NAME, service_name, _get_spark_options(options, use_hdfs))
     _wait_for_spark(service_name)
     _require_spark_cli()
 
@@ -141,15 +115,8 @@ def _require_spark_cli():
         LOGGER.info("Spark CLI already installed.")
     else:
         LOGGER.info("Installing Spark CLI.")
-        shakedown.run_dcos_command('package install --cli {}'.format(
+        shakedown.run_dcos_command('package install --cli {} --yes'.format(
             SPARK_PACKAGE_NAME))
-
-
-def _get_kafka_options(kerberized):
-    if kerberized:
-        raise NotImplementedError("TODO")
-    else:
-        return {"service": {}}
 
 
 def _get_hdfs_options():
@@ -185,13 +152,16 @@ def no_spark_jobs(service_name):
     return len(driver_ips) == 0
 
 
-def _get_spark_options(options = None):
+def _get_spark_options(options, use_hdfs):
     if options is None:
         options = {}
 
-    if hdfs_enabled():
+    if use_hdfs:
         options["hdfs"] = options.get("hdfs", {})
         options["hdfs"]["config-url"] = "http://api.hdfs.marathon.l4lb.thisdcos.directory/v1/endpoints"
+        options["security"] = options.get("security", {})
+        options["security"]["kerberos"] = options["security"].get("kerberos", {})
+        options["security"]["kerberos"]["krb5conf"] = "W2xpYmRlZmF1bHRzXQpkZWZhdWx0X3JlYWxtID0gTE9DQUwKZG5zX2xvb2t1cF9yZWFsbSA9IHRydWUKZG5zX2xvb2t1cF9rZGMgPSB0cnVlCnVkcF9wcmVmZXJlbmNlX2xpbWl0ID0gMQoKW3JlYWxtc10KICBMT0NBTCA9IHsKICAgIGtkYyA9IGtkYy5tYXJhdGhvbi5tZXNvczoyNTAwCiAgfQoKW2RvbWFpbl9yZWFsbV0KICAuaGRmcy5kY29zID0gTE9DQUwKICBoZGZzLmRjb3MgPSBMT0NBTAo="
 
     if is_strict():
         options["service"] = options.get("service", {})
@@ -301,3 +271,15 @@ def is_framework_completed(fw_name):
 
 def _scala_test_jar_url():
     return s3.http_url(os.path.basename(os.environ["SCALA_TEST_JAR_PATH"]))
+
+
+def _run_janitor():
+    janitor_cmd = (
+        'docker run mesosphere/janitor /janitor.py '
+        '-r spark-role -p spark-principal -z spark_mesos_dispatcher --auth_token={auth}')
+    shakedown.run_command_on_master(janitor_cmd.format(
+        auth=shakedown.dcos_acs_token()))
+
+def teardown_spark():
+    shakedown.uninstall_package_and_wait(SPARK_PACKAGE_NAME)
+    _run_janitor()
