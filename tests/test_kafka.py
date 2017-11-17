@@ -1,14 +1,29 @@
 import logging
 import os
 import pytest
-import s3
 import json
 import shakedown
+import subprocess
 
-import utils
+from tests import s3, utils
+
+import sdk_auth
+import sdk_hosts
+import sdk_install
 
 
-PRODUCER_SERVICE_NAME="Spark->Kafka Producer"
+LOGGER = logging.getLogger(__name__)
+PRODUCER_SERVICE_NAME = "Spark->Kafka Producer"
+GENERIC_HDFS_USER_PRINCIPAL = "client@{realm}".format(realm=sdk_auth.REALM)
+
+DEFAULT_KAFKA_TASK_COUNT=3
+KERBERIZED_KAFKA = True
+KAFKA_KRB5="W2xpYmRlZmF1bHRzXQpkZWZhdWx0X3JlYWxtID0gTE9DQUwKCltyZW" \
+           "FsbXNdCiAgTE9DQUwgPSB7CiAgICBrZGMgPSBrZGMubWFyYXRob24u" \
+           "YXV0b2lwLmRjb3MudGhpc2Rjb3MuZGlyZWN0b3J5OjI1MDAKICB9Cg=="
+# Currently using stub-universe so it's beta-kafka, for the last time
+KAFKA_PACKAGE_NAME = "beta-kafka"
+KAFKA_SERVICE_NAME = "secure-kafka" if KERBERIZED_KAFKA else "kafka"
 
 
 def setup_module(module):
@@ -17,7 +32,8 @@ def setup_module(module):
 
 
 def teardown_module(module):
-    shakedown.uninstall_package_and_wait(utils.SPARK_PACKAGE_NAME)
+    utils.teardown_spark()
+    sdk_install.uninstall(KAFKA_PACKAGE_NAME, KAFKA_SERVICE_NAME)
 
 
 @pytest.mark.runnow
