@@ -12,9 +12,11 @@ function does_profile_exist() {
 
 # uploads build/spark/spark-*.tgz to S3
 function upload_to_s3 {
-    # Try this:
-    aws s3 cp --acl public-read "${DIST_DIR}/${SPARK_DIST_DIR}/${SPARK_DIST}" "${S3_URL}"
-    #aws s3 cp --acl public-read "${SPARK_DIST_DIR}/${SPARK_DIST}" "${S3_URL}"
+    aws s3 cp --acl public-read "${SPARK_DIST_DIR}/${SPARK_DIST}" "${S3_URL}"
+}
+
+function upload_to_s3_old {
+    aws s3 cp --acl public-read "${DIST_DIR}/${SPARK_DIST}" "${S3_URL}"
 }
 
 function set_hadoop_versions {
@@ -24,10 +26,9 @@ function set_hadoop_versions {
 # rename build/dist/spark-*.tgz to build/dist/spark-<TAG>.tgz
 # globals: $SPARK_VERSION
 function rename_dist {
+    echo "renaming with spark version ${SPARK_VERSION} and hadoop ${HADOOP_VERSION}"
     SPARK_DIST_DIR="spark-${SPARK_VERSION}-bin-${HADOOP_VERSION}"
     SPARK_DIST="${SPARK_DIST_DIR}.tgz"
-
-    mkdir -p "${SPARK_DIST_DIR}"
 
     pushd "${DIST_DIR}"
     tar xvf spark-*.tgz
@@ -38,6 +39,34 @@ function rename_dist {
     popd
 }
 
+function make_prod_distribution {
+    local HADOOP_VERSION=$1
+    echo "making prod dustribution for Hadoop version ${HADOOP_VERSION}"
+
+    rm -rf "${DIST_DIR}"
+    mkdir -p "${DIST_DIR}"
+
+    pushd "${SPARK_DIR}"
+    rm -rf spark-*.tgz
+
+    if [ -f make-distribution.sh ]; then
+        # Spark <2.0
+        ./make-distribution.sh --tgz "-Phadoop-${HADOOP_VERSION}" -Phive -Phive-thriftserver -DskipTests
+    else
+        # Spark >=2.0
+        if does_profile_exist "mesos"; then
+            MESOS_PROFILE="-Pmesos"
+        else
+            MESOS_PROFILE=""
+        fi
+        ./dev/make-distribution.sh --tgz "${MESOS_PROFILE}" "-Phadoop-${HADOOP_VERSION}" -Psparkr -Phive -Phive-thriftserver -DskipTests
+    fi
+
+    mkdir -p "${DIST_DIR}"
+    cp spark-*.tgz "${DIST_DIR}"
+
+    popd
+}
 
 function publish_dists() {
     set_hadoop_versions
@@ -51,19 +80,22 @@ function publish_dists() {
 
 # $1: hadoop version (e.g. "2.6")
 function publish_dist() {
-    make prod-dist -e HADOOP_VERSION=$1
+    #make prod-dist -e HADOOP_VERSION=$1
+    make_prod_distribution $1
     rename_dist
     AWS_ACCESS_KEY_ID=${PROD_AWS_ACCESS_KEY_ID} \
                      AWS_SECRET_ACCESS_KEY=${PROD_AWS_SECRET_ACCESS_KEY} \
                      S3_URL="s3://${PROD_S3_BUCKET}/${PROD_S3_PREFIX}/" \
-                     upload_to_s3
+                     upload_to_s3_old
     make clean-dist
 }
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SPARK_DIR="${DIR}/../../spark"
-SPARK_BUILD_DIR="${DIR}/.."
-DIST_DIR="${DIR}/../build/dist"
+SPARK_BUILD_DIR="${DIR}/../../spark-build"
+SPARK_VERSION=${GIT_BRANCH#origin/tags/custom-} # e.g. "2.0.2"
+DIST_DIR="${SPARK_BUILD_DIR}/build/dist"
+
 SPARK_VERSION=${GIT_BRANCH#origin/tags/custom-} # e.g. "2.0.2"
 
 pushd "${SPARK_BUILD_DIR}"
