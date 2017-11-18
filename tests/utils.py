@@ -51,7 +51,6 @@ def require_hdfs():
     )
     _wait_for_hdfs()
 
-
 def streaming_job_launched(job_name):
     return shakedown.get_service(job_name) is not None
 
