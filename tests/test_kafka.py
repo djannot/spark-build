@@ -8,6 +8,7 @@ import subprocess
 from tests import s3, utils
 
 import sdk_auth
+import sdk_cmd
 import sdk_hosts
 import sdk_install
 
@@ -31,6 +32,11 @@ KAFKA_SERVICE_NAME = "secure-kafka" if KERBERIZED_KAFKA else "kafka"
 @pytest.fixture(scope='module')
 def kerberized_kafka():
     try:
+        LOGGER.warning('Temporarily using Kafka stub universe until kerberos is released')
+        sdk_cmd.run_cli('package repo add --index=0 {} {}'.format(
+        'kafka-aws',
+        'https://universe-converter.mesosphere.com/transform?url=https://infinity-artifacts.s3.amazonaws.com/beta-kafka/20171116-095256-ui8c625WXxUN6abI/stub-universe-beta-kafka.json')
+    )
         fqdn = "{service_name}.{host_suffix}".format(service_name=KAFKA_SERVICE_NAME,
                                                      host_suffix=sdk_hosts.AUTOIP_HOST_SUFFIX)
 
