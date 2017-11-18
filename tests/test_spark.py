@@ -277,7 +277,6 @@ def test_secrets():
 
 
 @pytest.mark.sanity
-@pytest.mark.multspaces
 def test_cli_multiple_spaces():
     utils.run_tests(app_url=SPARK_EXAMPLES,
                     app_args="30",
