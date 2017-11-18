@@ -26,6 +26,7 @@ function set_hadoop_versions {
 # rename build/dist/spark-*.tgz to build/dist/spark-<TAG>.tgz
 # globals: $SPARK_VERSION
 function rename_dist {
+
     echo "renaming with spark version ${SPARK_VERSION} and hadoop ${HADOOP_VERSION}"
     SPARK_DIST_DIR="spark-${SPARK_VERSION}-bin-${HADOOP_VERSION}"
     SPARK_DIST="${SPARK_DIST_DIR}.tgz"
@@ -41,7 +42,7 @@ function rename_dist {
 
 function make_prod_distribution {
     local HADOOP_VERSION=$1
-    echo "making prod dustribution for Hadoop version ${HADOOP_VERSION}"
+    echo "making prod distribution for Hadoop version ${HADOOP_VERSION}"
 
     rm -rf "${DIST_DIR}"
     mkdir -p "${DIST_DIR}"
@@ -96,7 +97,6 @@ SPARK_BUILD_DIR="${DIR}/../../spark-build"
 SPARK_VERSION=${GIT_BRANCH#origin/tags/custom-} # e.g. "2.0.2"
 DIST_DIR="${SPARK_BUILD_DIR}/build/dist"
 
-SPARK_VERSION=${GIT_BRANCH#origin/tags/custom-} # e.g. "2.0.2"
 
 pushd "${SPARK_BUILD_DIR}"
 publish_dists
