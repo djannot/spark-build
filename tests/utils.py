@@ -38,6 +38,18 @@ def is_strict():
     return os.environ.get('SECURITY') == 'strict'
 
 
+def streaming_job_launched(job_name):
+    return shakedown.get_service(job_name) is not None
+
+
+def streaming_job_running(job_name):
+    f = shakedown.get_service(job_name)
+    if f is None:
+        return False
+    else:
+        return len([x for x in f.dict()["tasks"] if x["state"] == "TASK_RUNNING"]) > 0
+
+
 def require_spark(options=None, service_name=None, use_hdfs=False):
     LOGGER.info("Ensuring Spark is installed.")
 
