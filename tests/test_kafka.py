@@ -17,7 +17,6 @@ LOGGER = logging.getLogger(__name__)
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 PRODUCER_SERVICE_NAME = "Spark->Kafka Producer"
-GENERIC_HDFS_USER_PRINCIPAL = "client@{realm}".format(realm=sdk_auth.REALM)
 
 DEFAULT_KAFKA_TASK_COUNT=3
 KERBERIZED_KAFKA = True
