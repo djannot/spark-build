@@ -93,7 +93,6 @@ def setup_spark(kerberized_kafka):
         utils.teardown_spark()
 
 
-@pytest.mark.runnow
 @pytest.mark.sanity
 @pytest.mark.skipif(not utils.kafka_enabled(), reason='KAFKA_ENABLED is false')
 def test_spark_and_kafka():
