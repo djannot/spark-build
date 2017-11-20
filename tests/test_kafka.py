@@ -151,7 +151,7 @@ def test_spark_and_kafka():
     ]
 
     producer_config = ["--conf", "spark.cores.max=2", "--conf", "spark.executor.cores=2",
-                       "--class", "KafkaProducer"] + common_args
+                       "--class", "KafkaFeeder"] + common_args
 
     if KERBERIZED_KAFKA:
         producer_config += kerberos_args
