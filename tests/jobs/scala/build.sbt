@@ -12,6 +12,24 @@ lazy val root = (project in file("."))
     )
   )
 
+scalacOptions ++= Seq(
+  "-deprecation",
+  "-encoding", "UTF-8",
+  "-feature",
+  "-language:existentials",
+  "-language:higherKinds",
+  "-language:implicitConversions",
+  "-language:experimental.macros",
+  "-language:postfixOps",
+  "-unchecked",
+  "-Xlint",
+  "-Yinline-warnings",
+  "-Yno-adapted-args",
+  "-Ywarn-dead-code",
+  "-Ywarn-numeric-widen",
+  "-Ywarn-unused-import",
+  "-Xfuture")
+
 assemblyMergeStrategy in assembly := {
   // https://github.com/sbt/sbt-assembly/issues/80#issuecomment-27927098
   case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard

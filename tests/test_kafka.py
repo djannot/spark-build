@@ -87,6 +87,9 @@ def kerberized_kafka():
 @pytest.fixture(scope='module', autouse=True)
 def setup_spark(kerberized_kafka):
     try:
+        # need to do this here also in case this test is run first
+        # and the jar hasn't been updated
+        utils.upload_file(os.environ["SCALA_TEST_JAR_PATH"])
         utils.require_spark()
         yield
     finally:
@@ -94,6 +97,7 @@ def setup_spark(kerberized_kafka):
 
 
 @pytest.mark.sanity
+@pytest.mark.runnow
 @pytest.mark.skipif(not utils.kafka_enabled(), reason='KAFKA_ENABLED is false')
 def test_spark_and_kafka():
     def producer_launched():
@@ -103,13 +107,10 @@ def test_spark_and_kafka():
         return utils.streaming_job_running(PRODUCER_SERVICE_NAME)
 
     def kafka_broker_dns():
-        cmd = "dcos {package_name} --name={service_name} endpoints broker".format(
+        cmd = "{package_name} --name={service_name} endpoints broker".format(
             package_name=KAFKA_PACKAGE_NAME, service_name=KAFKA_SERVICE_NAME)
-        try:
-            stdout = subprocess.check_output(cmd, shell=True).decode('utf-8')
-        except Exception as e:
-            raise e("Failed to get broker endpoints")
-
+        rt, stdout, stderr = sdk_cmd.run_raw_cli(cmd)
+        assert rt == 0, "Failed to get broker endpoints"
         return json.loads(stdout)["dns"][0]
 
     kerberos_flag = "true" if KERBERIZED_KAFKA else "false"  # flag for using kerberized kafka given to app
@@ -162,7 +163,8 @@ def test_spark_and_kafka():
                                    args=producer_config)
 
     shakedown.wait_for(lambda: producer_launched(), ignore_exceptions=False, timeout_seconds=600)
-    shakedown.wait_for(lambda: producer_started(), ignore_exceptions=False, timeout_seconds=600)
+    shakedown.wait_for(lambda: utils.is_service_ready(KAFKA_SERVICE_NAME, 1),
+                       ignore_exceptions=False, timeout_seconds=600)
 
     consumer_config = ["--conf", "spark.cores.max=4", "--class", "KafkaConsumer"] + common_args
 

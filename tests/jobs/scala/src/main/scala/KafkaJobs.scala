@@ -1,17 +1,19 @@
 import java.util
 
-import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
-import org.apache.spark.storage.StorageLevel
-import org.apache.kafka.common.serialization.StringDeserializer
-import org.apache.spark.rdd.RDD
-import org.apache.spark.streaming.kafka010._
-import org.apache.spark.util.LongAccumulator
-import org.apache.spark.streaming.{Seconds, StreamingContext, Time}
-import org.apache.spark.streaming.receiver._
-
 import scala.collection.mutable
 import scala.util.Random
+
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
+import org.apache.kafka.common.serialization.StringDeserializer
+
+import org.apache.spark.rdd.RDD
+import org.apache.spark.storage.StorageLevel
+import org.apache.spark.streaming.kafka010._
+import org.apache.spark.streaming.receiver._
+import org.apache.spark.streaming.{Seconds, StreamingContext, Time}
+import org.apache.spark.util.LongAccumulator
+import org.apache.spark.{SparkConf, SparkContext}
+
 
 object WordAccumulator {
 
@@ -29,7 +31,6 @@ object WordAccumulator {
   }
 }
 
-
 object KafkaConsumer {
   def main(args: Array[String]): Unit = {
     if (args.length != 4) {
@@ -37,7 +38,6 @@ object KafkaConsumer {
     }
 
     val Array(brokers, topic, stopcount, kerberized) = args
-
     val conf = new SparkConf().setAppName("Kafka->Spark Validator Consumer")
     val ssc = new StreamingContext(conf, Seconds(2))
 
@@ -94,25 +94,27 @@ object KafkaFeeder {
   class SmartySource(words: Array[String], sentenceLength: Int, ratePerSec: Int)
     extends Receiver[String](StorageLevel.MEMORY_AND_DISK_2) {
 
-    def onStart() {
+    def onStart(): Unit = {
       // Start the thread that receives data over a connection
       new Thread("Dummy Source") {
-        override def run() { receive() }
+        override def run(): Unit = {
+          receive()
+        }
       }.start()
     }
 
-    def onStop() {
+    def onStop(): Unit = {
       // There is nothing much to do as the thread calling receive()
       // is designed to stop by itself isStopped() returns false
     }
 
     /** Create a socket connection and receive data until receiver is stopped */
-    private def receive() {
+    private def receive(): Unit = {
       while(!isStopped()) {
         // could do something where you wait for the sentence length to get so long
         // and you add words with their frequency probability
         store(Random.shuffle(words.toList).take(sentenceLength).mkString(" "))
-        Thread.sleep((1000.toDouble / ratePerSec).toInt)
+        Thread.sleep((1000.toDouble / ratePerSec).toLong)
       }
     }
   }
