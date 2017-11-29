@@ -22,6 +22,7 @@ COMMON_ARGS = ["--conf", "spark.driver.port=1024",
                "--conf", "spark.cores.max={}".format(TERASORT_MAX_CORES)]
 
 KAFKA_JAAS_URI = "https://s3-us-west-2.amazonaws.com/infinity-artifacts/soak/spark/spark-kafka-client-jaas.conf"
+JAR_URI = "https://s3-us-west-2.amazonaws.com/infinity-artifacts/soak/spark/dcos-spark-scala-tests-assembly-0.1-SNAPSHOT.jar"
 
 if HDFS_KERBEROS_ENABLED != 'false':
     COMMON_ARGS += KERBEROS_ARGS
@@ -49,7 +50,7 @@ def test_spark_kafka_interservice():
             LOGGER.warn("Got return code {rc} when trying to install {package} cli\nstdout:{out}\n{err}"
                         .format(rc=rc, package=KAFKA_PACKAGE_NAME, out=stdout, err=stderr))
         stop_count = os.getenv("STOP_COUNT", "1000")
-        test_pipeline(kerberos_flag="true", stop_count=stop_count, jaas_uri=KAFKA_JAAS_URI)
+        test_pipeline(kerberos_flag="true", stop_count=stop_count, jar_uri=JAR_URI, jaas_uri=KAFKA_JAAS_URI)
 
 
 def _run_teragen():

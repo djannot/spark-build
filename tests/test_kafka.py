@@ -101,10 +101,10 @@ def setup_spark(kerberized_kafka):
 def test_spark_and_kafka():
     kerberos_flag = "true" if KERBERIZED_KAFKA else "false"  # flag for using kerberized kafka given to app
     stop_count = "48"  # some reasonable number
-    test_pipeline(kerberos_flag=kerberos_flag, stop_count=stop_count)
+    test_pipeline(kerberos_flag=kerberos_flag, jar_uri=utils._scala_test_jar_url(), stop_count=stop_count)
 
 
-def test_pipeline(kerberos_flag, stop_count, jaas_uri=None):
+def test_pipeline(kerberos_flag, stop_count, jar_uri, jaas_uri=None):
     stop_count = str(stop_count)
     kerberized = True if kerberos_flag == "true" else False
     broker_dns = _kafka_broker_dns()
@@ -152,7 +152,7 @@ def test_pipeline(kerberos_flag, stop_count, jaas_uri=None):
     if kerberized:
         producer_config += kerberos_args
 
-    producer_id = utils.submit_job(app_url=utils._scala_test_jar_url(),
+    producer_id = utils.submit_job(app_url=jar_uri,
                                    app_args=producer_args,
                                    app_name="/spark",
                                    args=producer_config)
@@ -168,7 +168,7 @@ def test_pipeline(kerberos_flag, stop_count, jaas_uri=None):
 
     consumer_args = " ".join([broker_dns, topic, stop_count, kerberos_flag])
 
-    utils.run_tests(app_url=utils._scala_test_jar_url(),
+    utils.run_tests(app_url=jar_uri,
                     app_args=consumer_args,
                     expected_output="Read {} words".format(stop_count),
                     app_name="/spark",
