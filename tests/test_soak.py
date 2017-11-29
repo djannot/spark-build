@@ -21,10 +21,10 @@ KERBEROS_ARGS = ["--kerberos-principal", "hdfs/name-0-node.hdfs.autoip.dcos.this
 COMMON_ARGS = ["--conf", "spark.driver.port=1024",
                "--conf", "spark.cores.max={}".format(TERASORT_MAX_CORES)]
 
+KAFKA_JAAS_URI = "https://s3-us-west-2.amazonaws.com/infinity-artifacts/soak/spark/spark-kafka-client-jaas.conf"
 
 if HDFS_KERBEROS_ENABLED != 'false':
     COMMON_ARGS += KERBEROS_ARGS
-
 
 
 def setup_module(module):
@@ -48,7 +48,8 @@ def test_spark_kafka_interservice():
         if rc != 0:
             LOGGER.warn("Got return code {rc} when trying to install {package} cli\nstdout:{out}\n{err}"
                         .format(rc=rc, package=KAFKA_PACKAGE_NAME, out=stdout, err=stderr))
-        test_pipeline(kerberos_flag="true", stop_count=100)
+        stop_count = os.getenv("STOP_COUNT", "10000")
+        test_pipeline(kerberos_flag="true", stop_count=stop_count, jaas_uri=KAFKA_JAAS_URI)
 
 
 def _run_teragen():
