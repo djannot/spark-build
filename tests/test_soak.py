@@ -26,10 +26,10 @@ if HDFS_KERBEROS_ENABLED != 'false':
     COMMON_ARGS += KERBEROS_ARGS
 
 
-'''
+
 def setup_module(module):
     utils.require_spark(use_hdfs=True)
-'''
+
 
 @pytest.mark.soak
 def test_terasort():
