@@ -48,7 +48,7 @@ def test_spark_kafka_interservice():
         if rc != 0:
             LOGGER.warn("Got return code {rc} when trying to install {package} cli\nstdout:{out}\n{err}"
                         .format(rc=rc, package=KAFKA_PACKAGE_NAME, out=stdout, err=stderr))
-        stop_count = os.getenv("STOP_COUNT", "10000")
+        stop_count = os.getenv("STOP_COUNT", "1000")
         test_pipeline(kerberos_flag="true", stop_count=stop_count, jaas_uri=KAFKA_JAAS_URI)
 
 
