@@ -6,8 +6,10 @@ import logging
 import pytest
 import shakedown
 
-from tests import utils
+import sdk_cmd
 
+from tests import utils
+from tests.test_kafka import KAFKA_PACKAGE_NAME, test_pipeline
 
 LOGGER = logging.getLogger(__name__)
 SOAK_SPARK_APP_NAME='/spark'
@@ -18,13 +20,16 @@ KERBEROS_ARGS = ["--kerberos-principal", "hdfs/name-0-node.hdfs.autoip.dcos.this
                  "--keytab-secret-path", "/__dcos_base64___keytab"]
 COMMON_ARGS = ["--conf", "spark.driver.port=1024",
                "--conf", "spark.cores.max={}".format(TERASORT_MAX_CORES)]
+
+
 if HDFS_KERBEROS_ENABLED != 'false':
     COMMON_ARGS += KERBEROS_ARGS
 
 
+'''
 def setup_module(module):
     utils.require_spark(use_hdfs=True)
-
+'''
 
 @pytest.mark.soak
 def test_terasort():
@@ -33,6 +38,17 @@ def test_terasort():
         _run_teragen()
         _run_terasort()
         _run_teravalidate()
+
+
+@pytest.mark.soak
+@pytest.mark.rand
+def test_spark_kafka_interservice():
+    if utils.kafka_enabled():
+        rc, stdout, stderr = sdk_cmd.run_raw_cli("package install {} --yes --cli".format(KAFKA_PACKAGE_NAME))
+        if rc != 0:
+            LOGGER.warn("Got return code {rc} when trying to install {package} cli\nstdout:{out}\n{err}"
+                        .format(rc=rc, package=KAFKA_PACKAGE_NAME, out=stdout, err=stderr))
+        test_pipeline(kerberos_flag="true", stop_count=100)
 
 
 def _run_teragen():
