@@ -42,7 +42,6 @@ def test_terasort():
 
 
 @pytest.mark.soak
-@pytest.mark.rand
 def test_spark_kafka_interservice():
     if utils.kafka_enabled():
         rc, stdout, stderr = sdk_cmd.run_raw_cli("package install {} --yes --cli".format(KAFKA_PACKAGE_NAME))
