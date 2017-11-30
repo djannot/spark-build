@@ -12,7 +12,7 @@ from tests import utils
 from tests.test_kafka import KAFKA_PACKAGE_NAME, test_pipeline
 
 LOGGER = logging.getLogger(__name__)
-SOAK_SPARK_APP_NAME='/spark'
+SOAK_SPARK_SERVICE_NAME = os.getenv('SOAK_SPARK_SERVICE_NAME', '/spark')
 TERASORT_JAR='https://downloads.mesosphere.io/spark/examples/spark-terasort-1.1-jar-with-dependencies_2.11.jar'
 TERASORT_MAX_CORES=6
 HDFS_KERBEROS_ENABLED=os.getenv('HDFS_KERBEROS_ENABLED', 'true')
@@ -26,10 +26,12 @@ JAR_URI = "https://s3-us-west-2.amazonaws.com/infinity-artifacts/soak/spark/dcos
 
 if HDFS_KERBEROS_ENABLED != 'false':
     COMMON_ARGS += KERBEROS_ARGS
+DCOS_UID = os.getenv('DCOS_UID')
+DCOS_PASSWORD = os.getenv('DCOS_PASSWORD')
 
 
 def setup_module(module):
-    utils.require_spark(use_hdfs=True)
+    utils.require_spark(service_name=SOAK_SPARK_SERVICE_NAME, use_hdfs=True)
 
 
 @pytest.mark.soak
@@ -58,7 +60,7 @@ def _run_teragen():
     utils.run_tests(app_url=jar_url,
                     app_args="{} hdfs:///terasort_in".format(input_size),
                     expected_output="Number of records written",
-                    app_name=SOAK_SPARK_APP_NAME,
+                    app_name=SOAK_SPARK_SERVICE_NAME,
                     args=(["--class", "com.github.ehiggs.spark.terasort.TeraGen"] + COMMON_ARGS))
 
 
@@ -67,7 +69,7 @@ def _run_terasort():
     utils.run_tests(app_url=jar_url,
                     app_args="hdfs:///terasort_in hdfs:///terasort_out",
                     expected_output="",
-                    app_name=SOAK_SPARK_APP_NAME,
+                    app_name=SOAK_SPARK_SERVICE_NAME,
                     args=(["--class", "com.github.ehiggs.spark.terasort.TeraSort"] + COMMON_ARGS))
 
 
@@ -76,12 +78,15 @@ def _run_teravalidate():
     utils.run_tests(app_url=jar_url,
                     app_args="hdfs:///terasort_out hdfs:///terasort_validate",
                     expected_output="partitions are properly sorted",
-                    app_name=SOAK_SPARK_APP_NAME,
+                    app_name=SOAK_SPARK_SERVICE_NAME,
                     args=(["--class", "com.github.ehiggs.spark.terasort.TeraValidate"] + COMMON_ARGS))
 
 
 def _delete_hdfs_terasort_files():
-    job_name = 'hdfs-delete-terasort-files'
+    if HDFS_KERBEROS_ENABLED != 'false':
+        job_name = 'hdfs-kerberos-delete-terasort-files'
+    else:
+        job_name = 'hdfs-delete-terasort-files'
     LOGGER.info("Deleting hdfs terasort files by running job {}".format(job_name))
     metronome_client = dcos.metronome.create_client()
     if not _job_exists(metronome_client, job_name):
@@ -103,6 +108,10 @@ def _add_job(metronome_client, job_name):
     job_path = os.path.join(jobs_folder, '{}.json'.format(job_name))
     with open(job_path) as job_file:
         job = json.load(job_file)
+    job["run"] = job.get("run", {})
+    job["run"]["env"] = job["run"].get("env", {})
+    job["run"]["env"]["DCOS_UID"] = DCOS_UID
+    job["run"]["env"]["DCOS_PASSWORD"] = DCOS_PASSWORD
     metronome_client.add_job(job)
 
 
