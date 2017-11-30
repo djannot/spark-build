@@ -3,7 +3,7 @@
     "cpus": {{service.cpus}},
     "mem": {{service.mem}},
     "cmd": "/sbin/init.sh",
-    "user": "nobody",
+    "user": "{{service.user}}",
     "env": {
 {{#security.kerberos.krb5conf}}
         "SPARK_MESOS_KRB5_CONF_BASE64": "{{security.kerberos.krb5conf}}",
