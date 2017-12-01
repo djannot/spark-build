@@ -1,5 +1,5 @@
 ---
-post_title: Configure Spark for HDFS
+post_title: Integration with HDFS
 nav_title: HDFS
 menu_order: 20
 enterprise: 'no'
@@ -7,7 +7,7 @@ enterprise: 'no'
 
 You can configure Spark for a specific HDFS cluster.
 
-To configure `hdfs.config-url` to be a URL that serves your `hdfs-site.xml` and `core-site.xml`, use this example where `http://mydomain.com/hdfs-config/hdfs-site.xml` and `http://mydomain.com/hdfs-config/core-site.xml` are valid URLs:
+Within the Spark service configuration, set `hdfs.config-url` to be a URL that serves your `hdfs-site.xml` and `core-site.xml`, use this example where `http://mydomain.com/hdfs-config/hdfs-site.xml` and `http://mydomain.com/hdfs-config/core-site.xml` are valid URLs:
 
 ```json
 {
@@ -19,27 +19,17 @@ To configure `hdfs.config-url` to be a URL that serves your `hdfs-site.xml` and 
 
 For more information, see [Inheriting Hadoop Cluster Configuration][8].
 
-For DC/OS HDFS, these configuration files are served at `http://<hdfs.framework-name>.marathon.mesos:<port>/v1/endpoints`, where `<hdfs.framework-name>` is a configuration variable set in the HDFS package, and `<port>` is the port of its marathon app.
-
-### Spark Checkpointing
-
-In order to use spark with checkpointing make sure you follow the instructions [here](https://spark.apache.org/docs/latest/streaming-programming-guide.html#checkpointing) and use an hdfs directory as the checkpointing directory. For example:
-```
-val checkpointDirectory = "hdfs://hdfs/checkpoint"
-val ssc = ...
-ssc.checkpoint(checkpointDirectory)
-```
-That hdfs directory will be automatically created on hdfs and spark streaming app will work from checkpointed data even in the presence of application restarts/failures.
+If you are using the default installation of HDFS from Mesosphere this is probably `http://api.hdfs.marathon.l4lb.thisdcos.directory/v1/endpoints`.
 
 # HDFS Kerberos
 
-You can access external (i.e. non-DC/OS) Kerberos-secured HDFS clusters from Spark on Mesos.
-
 ## HDFS Configuration
 
-After you've set up a Kerberos-enabled HDFS cluster, configure Spark to connect to it. See instructions [here](#hdfs).
+This section assumes you have previously set up a Kerberos-enabled HDFS cluster.
 
 ## Installation
+
+Spark (and all Kerberos-enabed) components need a valid `krb5.conf` file. You can setup the Spark service to use a single `krb5.conf` file for all of the it's drivers.
 
 1.  A `krb5.conf` file tells Spark how to connect to your KDC.  Base64 encode this file:
 
@@ -54,8 +44,12 @@ After you've set up a Kerberos-enabled HDFS cluster, configure Spark to connect 
               }
            }
         }
+        
+1.  Install Spark with your custom configuration, here called `options.json`:
 
-1. If you've enabled the history server via `history-server.enabled`, you must also configure the principal and keytab for the history server.  **WARNING**: The keytab contains secrets, so you should ensure you have SSL enabled while installing DC/OS Apache Spark.
+        dcos package install --options=options.json spark
+        
+1. If you've enabled the history server via `history-server.enabled`, you must also configure the principal and keytab for the history server.  **WARNING**: The keytab contains secrets, in the current history server package the keytab is not stored securely. See [Limitations][9]
 
     Base64 encode your keytab:
 
@@ -72,15 +66,11 @@ After you've set up a Kerberos-enabled HDFS cluster, configure Spark to connect 
             }
          }
 
-1.  Install Spark with your custom configuration, here called `options.json`:
-
-        dcos package install --options=options.json spark
-
 ## Job Submission
 
 To authenticate to a Kerberos KDC, DC/OS Apache Spark supports keytab files as well as ticket-granting tickets (TGTs).
 
-Keytabs are valid infinitely, while tickets can expire. Especially for long-running streaming jobs, keytabs are recommended.
+Keytabs are valid infinitely, while tickets can expire. Keytabs are recommended, especially for long-running streaming jobs.
 
 ### Keytab Authentication
 
@@ -94,14 +84,26 @@ Submit the job with the keytab:
 ### TGT Authentication
 
 Submit the job with the ticket:
-```$bash
+
     dcos spark run --submit-args="\
     --kerberos-principal hdfs/name-0-node.hdfs.autoip.dcos.thisdcos.directory@LOCAL \
     --tgt-secret-path /__dcos_base64__tgt \
     --conf ... --class MySparkJob <url> <args>"
-```
 
-**Note:** These credentials are security-critical. The DC/OS Secret Store requires you to base64 encode binary secrets (such as the Kerberos keytab) before adding them. If they are uploaded with the `__dcos_base64__` prefix, they are automatically decoded when the secret is made available to your Spark job. If the secret name **doesn't** have this prefix, the keytab will be decoded and written to a file in the sandbox. This leaves the secret exposed and is not recommended. We also highly recommended configuring SSL encryption between the Spark components when accessing Kerberos-secured HDFS clusters. See the Security section for information on how to do this.
+**Note:** You can access external (i.e. non-DC/OS) Kerberos-secured HDFS clusters from Spark on Mesos.
+
+**Note:** These credentials are security-critical. The DC/OS Secret Store requires you to base64 encode binary secrets (such as the Kerberos keytab) before adding them. If they are uploaded with the `__dcos_base64__` prefix, they are automatically decoded when the secret is made available to your Spark job. If the secret name **doesn't** have this prefix, the keytab will be decoded and written to a file in the sandbox. This leaves the secret exposed and is not recommended. 
+
+## Spark Checkpointing
+
+In order to use spark with checkpointing make sure you follow the instructions [here](https://spark.apache.org/docs/latest/streaming-programming-guide.html#checkpointing) and use an hdfs directory as the checkpointing directory. For example:
+```
+val checkpointDirectory = "hdfs://hdfs/checkpoint"
+val ssc = ...
+ssc.checkpoint(checkpointDirectory)
+```
+That hdfs directory will be automatically created on hdfs and spark streaming app will work from checkpointed data even in the presence of application restarts/failures.
 
 
 [8]: http://spark.apache.org/docs/latest/configuration.html#inheriting-hadoop-cluster-configuration
+[9]: https://docs.mesosphere.com/service-docs/spark/2.1.0-2.2.0-1/limitations/
