@@ -52,12 +52,12 @@ if ls ${MESOS_SANDBOX}/*.base64 1> /dev/null 2>&1; then
     done
 fi
 
-if [[ -n "${KRB5_CONFIG_BASE64}" ]]; then
-    KRB5CONF=${KRB5_CONFIG_BASE64}
-fi
-
 if [[ -n "${SPARK_MESOS_KRB5_CONF_BASE64}" ]]; then
     KRB5CONF=${SPARK_MESOS_KRB5_CONF_BASE64}
+fi
+
+if [[ -n "${KRB5_CONFIG_BASE64}" ]]; then
+    KRB5CONF=${KRB5_CONFIG_BASE64}
 fi
 
 if [[ -n "${KRB5CONF}" ]]; then
