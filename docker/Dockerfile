@@ -35,7 +35,6 @@ RUN apt-get update && \
             curl \
             unzip \
             r-base
-            
 
 # lib mesos
 RUN mkdir -p /opt/mesosphere/ && \
