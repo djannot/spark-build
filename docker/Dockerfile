@@ -34,7 +34,10 @@ RUN apt-get update && \
             krb5-user \
             curl \
             unzip \
-            r-base
+            r-base \
+            ipython \
+            ipython-notebook
+
 
 # lib mesos
 RUN mkdir -p /opt/mesosphere/ && \

@@ -22,3 +22,11 @@ enterprise: 'no'
 1.  View your job:
 
 Visit the Spark cluster dispatcher at `http://<dcos-url>/service/spark/` to view the status of your job. Also visit the Mesos UI at `http://<dcos-url>/mesos/` to see job logs.
+
+## Advanced
+
+1.  Run an Spark Streaming job with Kerberized Kafka:
+
+        dcos spark run --submit-args="https://downloads.mesosphere.com/spark/examples/dataframe.R"
+        
+
