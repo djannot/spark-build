@@ -121,4 +121,4 @@ Finally, you'll likely need to tell Spark to use the JAAS file:
         --conf spark.executor.extraJavaOptions=-Djava.security.auth.login.config=/mnt/mesos/sandbox/<jaas_file>
 
 
-For a worked example of a Spark consumer from secure Kafka see the [advanced examples][https://docs.mesosphere.com/service-docs/spark/2.1.0-2.2.0-1//]
+For a worked example of a Spark consumer from secure Kafka see the [advanced examples][https://docs.mesosphere.com/service-docs/spark/2.1.1-2.2.0-2/usage-examples/]
