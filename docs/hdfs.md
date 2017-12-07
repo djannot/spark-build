@@ -21,7 +21,7 @@ Within the Spark service configuration, set `hdfs.config-url` to be a URL that s
 This can also be done through the UI. If you are using the default installation of HDFS from Mesosphere this is probably `http://api.hdfs.marathon.l4lb.thisdcos.directory/v1/endpoints`.
 
 # Adding HDFS files per-job
-To add the configuration files manually for a job, use `--conf spark.mesos.uris=<loation_of_hdfs-site.xml>,<location_of_core-site.xml>`. This will download the files to the sandbox of the Driver Spark application, and DC/OS Spark will automatically load these files into the correct location. **Note** It is important these files are called `hdfs-site.xml` and `core-site.xml`. 
+To add the configuration files manually for a job, use `--conf spark.mesos.uris=<location_of_hdfs-site.xml>,<location_of_core-site.xml>`. This will download the files to the sandbox of the Driver Spark application, and DC/OS Spark will automatically load these files into the correct location. **Note** It is important these files are called `hdfs-site.xml` and `core-site.xml`.
 
 ## Spark Checkpointing
 

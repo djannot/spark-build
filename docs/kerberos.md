@@ -12,7 +12,7 @@ Kerberos is an authentication system to allow Spark to retrieve and write data s
 
 ## Spark Installation
 
-Spark (and all Kerberos-enabed) components need a valid `krb5.conf` file. You can setup the Spark service to use a single `krb5.conf` file for all of the it's drivers.
+Spark (and all Kerberos-enabed) components need a valid `krb5.conf` file. You can setup the Spark service to use a single `krb5.conf` file for all of the its drivers.
 
 1.  A `krb5.conf` file tells Spark how to connect to your KDC.  Base64 encode this file:
 
@@ -50,6 +50,8 @@ Spark (and all Kerberos-enabed) components need a valid `krb5.conf` file. You ca
 
         dcos package install --options=/path/to/options.json spark
         
+1.  Make sure your keytab is accessible from the DC/OS [Secret Store][https://docs.mesosphere.com/latest/security/secrets/].
+
 1. If you've enabled the history server via `history-server.enabled`, you must also configure the principal and keytab for the history server.  **WARNING**: The keytab contains secrets, in the current history server package the keytab is not stored securely. See [Limitations][9]
 
     Base64 encode your keytab:
@@ -110,9 +112,9 @@ Spark can consume data from a Kerberos-enabled Kafka cluster. You can find instr
 *   The `keytab` containing the credentials for accessing the Kafka cluster.
         
         --conf spark.mesos.driver.secret.names=<base64_encoded_keytab>    # e.g. __dcos_base64__kafka_keytab
-        --conf spark.mesos.driver.secret.filenames=kafka-client.keytab    # e.g. __dcos_base64__kafka_keytab
+        --conf spark.mesos.driver.secret.filenames=<keytab_file_name>     # e.g. kafka.keytab
         --conf spark.mesos.executor.secret.names=<base64_encoded_keytab>  # e.g. __dcos_base64__kafka_keytab
-        --conf spark.mesos.executor.secret.filenames=kafka-client.keytab  # e.g. __dcos_base64__kafka_keytab
+        --conf spark.mesos.executor.secret.filenames=<keytab_file_name>   # e.g. kafka.keytab
         
 
 Finally, you'll likely need to tell Spark to use the JAAS file:
@@ -121,4 +123,4 @@ Finally, you'll likely need to tell Spark to use the JAAS file:
         --conf spark.executor.extraJavaOptions=-Djava.security.auth.login.config=/mnt/mesos/sandbox/<jaas_file>
 
 
-For a worked example of a Spark consumer from secure Kafka see the [advanced examples][https://docs.mesosphere.com/service-docs/spark/2.1.1-2.2.0-2/usage-examples/]
+It is important that the filename is the same for the driver and executor keytab file (`<keytab_file_name>` above) and that this file is properly addressed in your JAAS file. For a worked example of a Spark consumer from secure Kafka see the [advanced examples][https://docs.mesosphere.com/service-docs/spark/2.1.1-2.2.0-2/usage-examples/]
