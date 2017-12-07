@@ -8,7 +8,7 @@ enterprise: 'no'
 
 # HDFS Kerberos
 
-Kerberos is an authentication system to allow Spark to retrieve and write data securely to a Kerberos-enabled HDFS cluster. As of Mesosphere Spark `2.2.0-2`, long-running jobs will renew their delegation tokens (authentication credentials). This section assumes you have previously set up a Kerberos-enabled HDFS cluster. For instruction on how to setup a secure HDFS cluster see the [HDFS documentation][http://example.com]
+Kerberos is an authentication system to allow Spark to retrieve and write data securely to a Kerberos-enabled HDFS cluster. As of Mesosphere Spark `2.2.0-2`, long-running jobs will renew their delegation tokens (authentication credentials). This section assumes you have previously set up a Kerberos-enabled HDFS cluster.
 
 ## Spark Installation
 
@@ -98,7 +98,7 @@ Submit the job with the ticket:
 
 # Kafka Kerberos
 
-Spark can consume data from a Kerberos-enabled Kafka cluster. You can find instructions on how to deploy a secure Kafka cluster on DC/OS in the [documentation][http://example.com]. Connecting Spark to secure Kafka does not require special installation parameters, however does require the Spark Driver _and_ the Spark Executors can access the following files:
+Spark can consume data from a Kerberos-enabled Kafka cluster. Connecting Spark to secure Kafka does not require special installation parameters, however does require the Spark Driver _and_ the Spark Executors can access the following files:
 
 *   Client JAAS (Java Authentication and Authorization Service) file. This is provided using Mesos URIS with `--conf spark.mesos.uris=<location_of_jaas>`.
 *   `krb5.conf` for your Kerberos setup. Similarly to HDFS, this is provided using a base64 encoding of the file.
