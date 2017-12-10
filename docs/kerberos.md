@@ -8,7 +8,7 @@ enterprise: 'no'
 
 # HDFS Kerberos
 
-Kerberos is an authentication system to allow Spark to retrieve and write data securely to a Kerberos-enabled HDFS cluster. As of Mesosphere Spark `2.2.0-2`, long-running jobs will renew their delegation tokens (authentication credentials). This section assumes you have previously set up a Kerberos-enabled HDFS cluster.
+Kerberos is an authentication system to allow Spark to retrieve and write data securely to a Kerberos-enabled HDFS cluster. As of Mesosphere Spark `2.2.0-2`, long-running jobs will renew their delegation tokens (authentication credentials). This section assumes you have previously set up a Kerberos-enabled HDFS cluster. **Note** Depending on your OS, Spark may need to be run as `root` in order to authenticate with your Kerberos-enabled service. This can be done by setting `--conf spark.mesos.driverEnv.SPARK_USER=root` when submitting your job.
 
 ## Spark Installation
 
