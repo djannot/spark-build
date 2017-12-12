@@ -145,6 +145,23 @@ func (cmd *SparkCommand) runWebui(a *kingpin.Application, e *kingpin.ParseElemen
 	return nil
 }
 
+func (cmd *SparkCommand) runGenerateSecret(a *kingpin.Application, e *kingpin.ParseElement, c *kingpin.ParseContext) error {
+	secret, err := GetRandomStringSecret(32)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Made a secret %s\n", secret)
+
+	ret, err := client.RunCLICommand(fmt.Sprintf("security secrets create /sparksecret -v %s", secret))
+	if err != nil {
+		return err
+	}
+	request := client.CreateHTTPRawRequest("PUT", "")
+	fmt.Printf("got return %s", ret)
+	return err
+}
+
 func handleCommands(app *kingpin.Application) {
 	cmd := &SparkCommand{submitEnv: make(map[string]string)}
 	run := app.Command("run", "Submit a job to the Spark Mesos Dispatcher").Action(cmd.runSubmit)
@@ -180,6 +197,8 @@ func handleCommands(app *kingpin.Application) {
 
 	kill := app.Command("kill", "Aborts a submitted Spark job").Action(cmd.runKill)
 	kill.Arg("submission-id", "The ID of the Spark job").Required().StringVar(&cmd.submissionId)
+
+	app.Command("secret", "make a shared secret").Action(cmd.runGenerateSecret)
 
 	app.Command("webui", "Returns the Spark Web UI URL").Action(cmd.runWebui)
 }
