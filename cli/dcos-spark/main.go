@@ -24,6 +24,7 @@ type SparkCommand struct {
 	submitDockerImage string
 	submitDcosSpace   string
 	submitEnv         map[string]string
+	secretPath		  string
 
 	statusSkipMessage bool
 
@@ -146,19 +147,20 @@ func (cmd *SparkCommand) runWebui(a *kingpin.Application, e *kingpin.ParseElemen
 }
 
 func (cmd *SparkCommand) runGenerateSecret(a *kingpin.Application, e *kingpin.ParseElement, c *kingpin.ParseContext) error {
-	secret, err := GetRandomStringSecret(32)
+	secret, err := GetRandomStringSecret()
+
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Made a secret %s\n", secret)
+	_, err = client.RunCLICommand(
+		"security", "secrets", "create", cmd.secretPath, fmt.Sprintf("-v %s", secret))
 
-	ret, err := client.RunCLICommand(fmt.Sprintf("security secrets create /sparksecret -v %s", secret))
 	if err != nil {
+		log.Fatalf("Unable to create secret, %s", err)
 		return err
 	}
-	request := client.CreateHTTPRawRequest("PUT", "")
-	fmt.Printf("got return %s", ret)
+
 	return err
 }
 
@@ -198,7 +200,8 @@ func handleCommands(app *kingpin.Application) {
 	kill := app.Command("kill", "Aborts a submitted Spark job").Action(cmd.runKill)
 	kill.Arg("submission-id", "The ID of the Spark job").Required().StringVar(&cmd.submissionId)
 
-	app.Command("secret", "make a shared secret").Action(cmd.runGenerateSecret)
+	secret := app.Command("secret", "make a shared secret").Action(cmd.runGenerateSecret)
+	secret.Arg("secret_path", "path and name for the secret").Required().StringVar(&cmd.secretPath)
 
 	app.Command("webui", "Returns the Spark Web UI URL").Action(cmd.runWebui)
 }
