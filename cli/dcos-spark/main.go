@@ -200,7 +200,8 @@ func handleCommands(app *kingpin.Application) {
 	kill := app.Command("kill", "Aborts a submitted Spark job").Action(cmd.runKill)
 	kill.Arg("submission-id", "The ID of the Spark job").Required().StringVar(&cmd.submissionId)
 
-	secret := app.Command("secret", "make a shared secret").Action(cmd.runGenerateSecret)
+	secret := app.Command("secret", "Make a shared secret, used for RPC authentication").
+		Action(cmd.runGenerateSecret)
 	secret.Arg("secret_path", "path and name for the secret").Required().StringVar(&cmd.secretPath)
 
 	app.Command("webui", "Returns the Spark Web UI URL").Action(cmd.runWebui)
