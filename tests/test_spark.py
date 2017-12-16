@@ -28,6 +28,7 @@ SECRET_NAME = "secret"
 SECRET_CONTENTS = "mgummelt"
 
 
+'''
 def setup_module(module):
     utils.require_spark()
     utils.upload_file(os.environ["SCALA_TEST_JAR_PATH"])
@@ -36,6 +37,7 @@ def setup_module(module):
 
 def teardown_module(module):
     utils.teardown_spark()
+    '''
 
 
 @pytest.mark.sanity
@@ -164,6 +166,20 @@ def _check_task_network_info(task):
 
 @pytest.mark.sanity
 def test_s3():
+    def make_credential_secret(envvar, secret_path):
+        rc, stdout, stderr = sdk_cmd.run_raw_cli("security secrets create {p} -v {e}"
+                                                 .format(p=secret_path, e=os.environ[envvar]))
+        assert rc == 0, "Failed to create secret {secret} from envvar {envvar}, stderr: {err}, stdout: {out}".format(
+            secret=secret_path, envvar=envvar, err=stderr, out=stdout)
+
+    LOGGER.info("Creating AWS secrets")
+
+    aws_access_key_secret_path = "aws_access_key_id"
+    aws_secret_access_key_path = "aws_secret_access_key"
+
+    make_credential_secret(envvar="AWS_ACCESS_KEY_ID", secret_path="/{}".format(aws_access_key_secret_path))
+    make_credential_secret(envvar="AWS_SECRET_ACCESS_KEY", secret_path="/{}".format(aws_secret_access_key_path))
+
     linecount_path = os.path.join(THIS_DIR, 'resources', 'linecount.txt')
     s3.upload_file(linecount_path)
 
@@ -171,12 +187,12 @@ def test_s3():
         s3.s3n_url('linecount.txt'),
         s3.s3n_url("linecount-out"))
 
-    args = ["--conf",
-            "spark.mesos.driverEnv.AWS_ACCESS_KEY_ID={}".format(
-                os.environ["AWS_ACCESS_KEY_ID"]),
+    args = ["--conf", "spark.mesos.containerizer=mesos",
             "--conf",
-            "spark.mesos.driverEnv.AWS_SECRET_ACCESS_KEY={}".format(
-                os.environ["AWS_SECRET_ACCESS_KEY"]),
+            "spark.mesos.driver.secret.names=/{key},/{secret}".format(
+                key=aws_access_key_secret_path, secret=aws_secret_access_key_path),
+            "--conf",
+            "spark.mesos.driver.secret.envkeys=AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY",
             "--class", "S3Job"]
     utils.run_tests(app_url=utils._scala_test_jar_url(),
                     app_args=app_args,
