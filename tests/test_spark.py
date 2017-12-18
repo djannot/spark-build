@@ -244,28 +244,6 @@ def test_marathon_group():
 
 
 @pytest.mark.sanity
-@pytest.mark.secrets
-def test_secrets():
-    properties_file_path = os.path.join(THIS_DIR, "resources", "secrets-opts.txt")
-    # Create secret
-    shakedown.run_dcos_command('security secrets create /{} --value {}'.format(SECRET_NAME, SECRET_CONTENTS))
-
-    secret_file_name = "secret_file"
-    output = "Contents of file {}: {}".format(secret_file_name, SECRET_CONTENTS)
-    args = ["--properties-file", properties_file_path,
-            "--class", "SecretsJob"]
-    try:
-        utils.run_tests(app_url=utils._scala_test_jar_url(),
-                        app_args=secret_file_name,
-                        expected_output=output,
-                        args=args)
-
-    finally:
-        # Delete secret
-        shakedown.run_dcos_command('security secrets delete /{}'.format(SECRET_NAME))
-
-
-@pytest.mark.sanity
 def test_cli_multiple_spaces():
     utils.run_tests(app_url=utils.SPARK_EXAMPLES,
                     app_args="30",
