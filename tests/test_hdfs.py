@@ -14,18 +14,21 @@ import sdk_marathon
 import sdk_security
 import sdk_tasks
 
+from tests import hdfs_auth
 from tests import utils
 
 
 log = logging.getLogger(__name__)
 DEFAULT_HDFS_TASK_COUNT=10
 GENERIC_HDFS_USER_PRINCIPAL = "hdfs@{realm}".format(realm=sdk_auth.REALM)
+ALICE_PRINCIPAL = "alice@{realm}".format(realm=sdk_auth.REALM)
 KEYTAB_SECRET_PATH = os.getenv("KEYTAB_SECRET_PATH", "__dcos_base64___keytab")
 # To do: change when no longer using HDFS stub universe
 HDFS_PACKAGE_NAME='beta-hdfs'
 HDFS_SERVICE_NAME='hdfs'
-KERBEROS_ARGS = ["--kerberos-principal", GENERIC_HDFS_USER_PRINCIPAL,
-                 "--keytab-secret-path", "/{}".format(KEYTAB_SECRET_PATH)]
+KERBEROS_ARGS = ["--kerberos-principal", ALICE_PRINCIPAL,
+                 "--keytab-secret-path", "/{}".format(KEYTAB_SECRET_PATH),
+                 "--conf", "spark.mesos.driverEnv.SPARK_USER={}".format(utils.SPARK_USER)]
 HDFS_CLIENT_ID = "hdfsclient"
 SPARK_HISTORY_USER = "nobody"
 
@@ -64,21 +67,27 @@ def hdfs_with_kerberos(configure_security_hdfs):
                 )
             )
         principals.append(GENERIC_HDFS_USER_PRINCIPAL)
+        principals.append(ALICE_PRINCIPAL)
 
         kerberos_env = sdk_auth.KerberosEnvironment()
         kerberos_env.add_principals(principals)
         kerberos_env.finalize()
         service_kerberos_options = {
             "service": {
-                "kerberos": {
-                    "enabled": True,
-                    "kdc_host_name": kerberos_env.get_host(),
-                    "kdc_host_port": kerberos_env.get_port(),
-                    "keytab_secret": kerberos_env.get_keytab_path(),
-                    "primary": primaries[0],
-                    "primary_http": primaries[1],
-                    "realm": sdk_auth.REALM
+                "security": {
+                    "kerberos": {
+                        "enabled": True,
+                        "kdc": {
+                            "hostname": kerberos_env.get_host(),
+                            "port": int(kerberos_env.get_port())
+                        },
+                        "keytab_secret": kerberos_env.get_keytab_path(),
+                        "realm": kerberos_env.get_realm()
+                    }
                 }
+            },
+            "hdfs": {
+                "security_auth_to_local": hdfs_auth.get_principal_to_user_mapping()
             }
         }
 
@@ -116,16 +125,23 @@ def setup_hdfs_client(hdfs_with_kerberos):
         sdk_marathon.install_app(hdfsclient_app_def)
 
         sdk_auth.kinit(HDFS_CLIENT_ID, keytab="hdfs.keytab", principal=GENERIC_HDFS_USER_PRINCIPAL)
+        hdfs_cmd("mkdir -p /users/alice")
+        hdfs_cmd("chown alice:users /users/alice")
         yield
 
     finally:
         sdk_marathon.destroy_app(HDFS_CLIENT_ID)
 
 
+def hdfs_cmd(cmd):
+    sdk_tasks.task_exec(HDFS_CLIENT_ID, "bin/hdfs dfs -{}".format(cmd))
+
+
 @pytest.fixture(scope='module')
 def setup_history_server(hdfs_with_kerberos, setup_hdfs_client, configure_universe):
     try:
-        sdk_tasks.task_exec(HDFS_CLIENT_ID, "bin/hdfs dfs -mkdir /history")
+        hdfs_cmd("mkdir /history")
+        hdfs_cmd("chmod 1777 /history")
 
         shakedown.install_package(
             package_name=utils.HISTORY_PACKAGE_NAME,
@@ -166,21 +182,26 @@ def setup_spark(hdfs_with_kerberos, setup_history_server, configure_security_spa
 def test_terasort_suite():
     jar_url = 'https://downloads.mesosphere.io/spark/examples/spark-terasort-1.1-jar-with-dependencies_2.11.jar'
 
+    data_dir = "hdfs:///users/alice"
+    terasort_in = "{}/{}".format(data_dir, "terasort_in")
+    terasort_out = "{}/{}".format(data_dir, "terasort_out")
+    terasort_validate = "{}/{}".format(data_dir, "terasort_validate")
+
     teragen_args=["--class", "com.github.ehiggs.spark.terasort.TeraGen"] + KERBEROS_ARGS
     utils.run_tests(app_url=jar_url,
-                    app_args="1g hdfs:///terasort_in",
+                    app_args="1g {}".format(terasort_in),
                     expected_output="Number of records written",
                     args=teragen_args)
 
     terasort_args = ["--class", "com.github.ehiggs.spark.terasort.TeraSort"] + KERBEROS_ARGS
     utils.run_tests(app_url=jar_url,
-                    app_args="hdfs:///terasort_in hdfs:///terasort_out",
+                    app_args="{} {}".format(terasort_in, terasort_out),
                     expected_output="",
                     args=terasort_args)
 
     teravalidate_args = ["--class", "com.github.ehiggs.spark.terasort.TeraValidate"] + KERBEROS_ARGS
     utils.run_tests(app_url=jar_url,
-                    app_args="hdfs:///terasort_out hdfs:///terasort_validate",
+                    app_args="{} {}".format(terasort_out, terasort_validate),
                     expected_output="partitions are properly sorted",
                     args=teravalidate_args)
 
@@ -209,7 +230,7 @@ def test_supervise():
                 "--conf", "spark.executors.cores=4"]
 
     driver_id = utils.submit_job(app_url=utils.SPARK_EXAMPLES,
-                                 app_args="10.0.0.1 9090 hdfs:///netcheck hdfs:///outfile",
+                                 app_args="10.0.0.1 9090 hdfs:///users/alice/netcheck hdfs:///users/alice/outfile",
                                  app_name=utils.SPARK_APP_NAME,
                                  args=(KERBEROS_ARGS + job_args))
     log.info("Started supervised driver {}".format(driver_id))
