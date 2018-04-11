@@ -277,6 +277,8 @@ object SpamHamStreamingClassifier {
       ssc,
       LocationStrategies.PreferConsistent,
       ConsumerStrategies.Subscribe[String, String](Array(topic), props))
+   
+   println("ok")
 
     val lines = messages.map(_.value)
     lines.foreachRDD { rdd: RDD[String] =>
