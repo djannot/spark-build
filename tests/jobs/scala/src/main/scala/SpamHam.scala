@@ -1,7 +1,7 @@
 import scala.util.Random
 import java.util
 
-import org.apache.spark.implicits._
+import spark.implicits._
 import org.apache.spark.ml.classification.NaiveBayes
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 import org.apache.spark.ml.feature._
