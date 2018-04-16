@@ -140,8 +140,11 @@ object Spammer {
     val ssc = new StreamingContext(spark.sparkContext, Seconds(2))
 
     val allMessages = spark.sparkContext.textFile(labeledMessages)
+println(allMessages)
     val spamCounts = cullWordCounts(allMessages, "spam")
+println(spamCounts)
     val hamCounts = cullWordCounts(allMessages, "ham")
+println(hamCounts)
 
     // The kafka producer requires a Java HashMap
     val props = new util.HashMap[String, Object]()
