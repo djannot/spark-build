@@ -157,19 +157,16 @@ object Spammer {
       props.put("sasl.mechanism", "GSSAPI")
     }
 
-    val stream = ssc.receiverStream(new MessageSource(spamCounts.collect, hamCounts.collect, 15, 1))
+    val stream = ssc.receiverStream(new MessageSource(spamCounts.collect, hamCounts.collect, 15, 10))
 
     stream.foreachRDD { rdd =>
- //rdd.collect().foreach(println)
       println(s"Number of events: ${rdd.count()}")
       rdd.foreachPartition { p =>
-println(1)
         val producer = new KafkaProducer[String, String](props)
         p.foreach { r =>
-println(r)
-          //val d = r.toString()
-          //val msg = new ProducerRecord[String, String](topic, null, d)
-          //producer.send(msg)
+          val d = r.toString()
+          val msg = new ProducerRecord[String, String](topic, null, d)
+          producer.send(msg)
         }
         producer.close()
       }
@@ -281,15 +278,17 @@ object SpamHamStreamingClassifier {
       LocationStrategies.PreferConsistent,
       ConsumerStrategies.Subscribe[String, String](Array(topic), props))
    
-   println("ok")
+println("ok")
 
     val lines = messages.map(_.value)
     lines.foreachRDD { rdd: RDD[String] =>
+println(1)
         val raw = spark.createDataFrame(SpamHamUtils.lineToRow(rdd), SpamHamUtils.SMSSchema)
         val predictions = model.transform(raw)
         val correct = CorrectAccumulator.getInstance(rdd.sparkContext)
         val total = TrialCounter.getInstance(rdd.sparkContext)
         predictions.foreach { r =>
+println(2)
           val label = r.getAs[Double](2)
           val prediction = r.getAs[Double](8)
           if (prediction == label) correct.add(1)
