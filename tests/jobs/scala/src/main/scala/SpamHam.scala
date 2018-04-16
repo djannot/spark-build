@@ -141,7 +141,6 @@ object Spammer {
 
     val allMessages = spark.sparkContext.textFile(labeledMessages)
     val spamCounts = cullWordCounts(allMessages, "spam")
-spamCounts.collect().foreach(println)
     val hamCounts = cullWordCounts(allMessages, "ham")
 
     // The kafka producer requires a Java HashMap
@@ -161,6 +160,7 @@ spamCounts.collect().foreach(println)
     val stream = ssc.receiverStream(new MessageSource(spamCounts.collect, hamCounts.collect, 15, 1))
 
     stream.foreachRDD { rdd =>
+ rdd.collect().foreach(println)
       println(s"Number of events: ${rdd.count()}")
       rdd.foreachPartition { p =>
         val producer = new KafkaProducer[String, String](props)
