@@ -166,12 +166,10 @@ object Spammer {
 println(1)
         val producer = new KafkaProducer[String, String](props)
         p.foreach { r =>
-println(2)
-          val d = r.toString()
-          val msg = new ProducerRecord[String, String](topic, null, d)
-println(3)
-          producer.send(msg)
-println(4)
+println(r)
+          //val d = r.toString()
+          //val msg = new ProducerRecord[String, String](topic, null, d)
+          //producer.send(msg)
         }
         producer.close()
       }
