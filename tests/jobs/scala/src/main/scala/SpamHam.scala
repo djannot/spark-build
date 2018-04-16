@@ -278,17 +278,21 @@ object SpamHamStreamingClassifier {
       LocationStrategies.PreferConsistent,
       ConsumerStrategies.Subscribe[String, String](Array(topic), props))
    
-println("ok")
+println(1)
+messages.collect().foreach(println)
 
     val lines = messages.map(_.value)
+println(2)
+lines.collect().foreach(println)
+
     lines.foreachRDD { rdd: RDD[String] =>
-println(1)
+println(3)
         val raw = spark.createDataFrame(SpamHamUtils.lineToRow(rdd), SpamHamUtils.SMSSchema)
         val predictions = model.transform(raw)
         val correct = CorrectAccumulator.getInstance(rdd.sparkContext)
         val total = TrialCounter.getInstance(rdd.sparkContext)
         predictions.foreach { r =>
-println(2)
+println(4)
           val label = r.getAs[Double](2)
           val prediction = r.getAs[Double](8)
           if (prediction == label) correct.add(1)
