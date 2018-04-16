@@ -163,12 +163,15 @@ object Spammer {
  rdd.collect().foreach(println)
       println(s"Number of events: ${rdd.count()}")
       rdd.foreachPartition { p =>
+println(1)
         val producer = new KafkaProducer[String, String](props)
         p.foreach { r =>
+println(2)
           val d = r.toString()
           val msg = new ProducerRecord[String, String](topic, null, d)
-println(msg)
+println(3)
           producer.send(msg)
+println(4)
         }
         producer.close()
       }
