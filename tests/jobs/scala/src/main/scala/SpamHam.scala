@@ -160,13 +160,12 @@ object Spammer {
     val stream = ssc.receiverStream(new MessageSource(spamCounts.collect, hamCounts.collect, 15, 1))
 
     stream.foreachRDD { rdd =>
- rdd.collect().foreach(println)
+ //rdd.collect().foreach(println)
       println(s"Number of events: ${rdd.count()}")
-      //rdd.foreachPartition { p =>
+      rdd.foreachPartition { p =>
 println(1)
         val producer = new KafkaProducer[String, String](props)
-        //p.foreach { r =>
-        rdd.foreach { r =>
+        p.foreach { r =>
 println(2)
           val d = r.toString()
           val msg = new ProducerRecord[String, String](topic, null, d)
@@ -175,7 +174,7 @@ println(3)
 println(4)
         }
         producer.close()
-      //}
+      }
     }
     ssc.start()
     ssc.awaitTermination()
